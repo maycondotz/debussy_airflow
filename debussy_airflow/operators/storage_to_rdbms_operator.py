@@ -19,6 +19,7 @@ class StorageToRdbmsOperator(BaseOperator):
         storage_hook: StorageHookInterface,
         table_name,
         storage_file_uri,
+        constraint_name = None,
         temp_folder="/tmp",
         **kwargs,
     ):
@@ -26,6 +27,7 @@ class StorageToRdbmsOperator(BaseOperator):
         self.storage_hook = storage_hook
         self.storage_file_uri = storage_file_uri
         self.table_name = table_name
+        self.constraint_name = constraint_name or None
         self.temp_folder = temp_folder
         super().__init__(**kwargs)
 
@@ -46,6 +48,6 @@ class StorageToRdbmsOperator(BaseOperator):
         )
         self.log.info("StorageToRdbmsOperator - Building insert query")
         query = self.dbapi_hook.build_upsert_query(
-            table_name=self.table_name, dataset_table=dataset_table)
+            table_name=self.table_name, dataset_table=dataset_table, constraint_name = self.constraint_name)
 
-        return self.dbapi_hook.query_run(sql=query, autocommit=True)
+        return self.dbapi_hook.query_run(sql=query, autocommit=True) if query else None
