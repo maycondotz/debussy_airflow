@@ -1,5 +1,4 @@
 from typing import Callable, List, Optional, Union, Dict, Any
-
 import requests
 from airflow.hooks.http_hook import HttpHook as AirflowHttpHook
 from airflow.models import BaseOperator
@@ -83,15 +82,17 @@ class RestApiToStorageOperator(BaseOperator):
         )
 
     def api_to_storage(
-        self, headers, data, endpoint, json, object_path, raw_object_path, httphook_kwargs, context
+        self, headers=None, data=None, endpoint=None, json=None, object_path=None, raw_object_path=None, httphook_kwargs=None ,context=None
     ):
         httphook_kwargs = httphook_kwargs or {}
         response = self.http_hook.run(headers=headers, endpoint=endpoint, json=json, data=data, **httphook_kwargs)
-        if self.flag_save_raw_response:
+
+        if self.flag_save_raw_response and raw_object_path:
             self.upload_from_string(self.raw_bucket, raw_object_path, response.text)
         data_string = self.transformer(response, **context)
+
         self.upload_from_string(self.bucket, object_path, data_string)
-        return len(data_string)
+        return len(data_string)    
 
     def execute(self, context):
         return self.api_to_storage(
@@ -106,7 +107,7 @@ class RestApiToStorageOperator(BaseOperator):
         )
 
 
-class RestListApiToStorageOperator(RestApiToStorageOperator):
+class RestListApiToStorageOperator(BaseOperator):
     template_fields = (
         "httphook_kwargs",
         "raw_object_paths",
@@ -141,7 +142,31 @@ class RestListApiToStorageOperator(RestApiToStorageOperator):
         ## NILTON AJUSTAR self.validate_params()
         self.raw_object_paths = raw_object_paths or object_paths
         self.raw_bucket = raw_bucket or bucket
-        self.httphook_kwargs = httphook_kwargs
+        self.httphook_kwargs = httphook_kwargs or []
+
+    @staticmethod
+    def response_transformer(response: requests.Response, **context) -> str:
+        return response.text
+
+    def upload_from_string(self, bucket, object_path, data_string):
+        self.log.info(f"Uploading data to gs://{bucket}/{object_path}")
+        self.storage_hook.upload_string(
+            remote_file_uri=f"gs://{bucket}/{object_path}", data_string=data_string
+        )
+
+    def api_to_storage_list(
+        self, headers=None, endpoint=None, object_path=None, raw_object_path=None, httphook_kwargs=None ,context=None
+    ):
+        httphook_kwargs = httphook_kwargs or {}
+        response = self.http_hook.run(headers=headers, endpoint=endpoint, **httphook_kwargs)
+
+        if self.flag_save_raw_response and raw_object_path:
+            self.upload_from_string(self.raw_bucket, raw_object_path, response.text)
+        data_string = self.transformer(response, **context)
+        
+        self.upload_from_string(self.bucket, object_path, data_string)
+        return len(data_string)
+       
 
     def execute(self, context):
         for endpoint, object_path, raw_object_path, httphook_kwargs in zip(
@@ -150,6 +175,6 @@ class RestListApiToStorageOperator(RestApiToStorageOperator):
             self.raw_object_paths,
             self.httphook_kwargs,
         ):
-            self.api_to_storage(
-                endpoint, object_path, raw_object_path, httphook_kwargs, context
+            self.api_to_storage_list(
+                endpoint=endpoint, object_path=object_path, raw_object_path=raw_object_path, httphook_kwargs=httphook_kwargs, context=context
             )
