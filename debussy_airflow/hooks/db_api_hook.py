@@ -14,7 +14,7 @@ class DbApiHookInterface(DbApiHook):
         pass
 
     @abstractmethod
-    def build_upsert_query(self, table_name: str, dataset_table: DataFrame):
+    def build_upsert_query(self, table_name: str, dataset_table: DataFrame, constraint_name: str = None):
         pass
 
 
@@ -40,7 +40,7 @@ class MySqlConnectorHook(DbApiHookInterface):
         conn_config = self._get_conn_config_mysql_client(conn)
         return mysql.connect(**conn_config)
 
-    def build_upsert_query(self, table_name: str, dataset_table: DataFrame):
+    def build_upsert_query(self, table_name: str, dataset_table: DataFrame, constraint_name: str = None):
         if dataset_table.empty:
             return None
 
@@ -89,16 +89,18 @@ class PostgreSQLConnectorHook(DbApiHookInterface):
         return conn_config
 
     def _get_primary_key(self, table_name):
-        pk_query = f"""
-            SELECT a.attname
-            FROM pg_index i
-            JOIN pg_attribute a 
-            ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
-            WHERE i.indrelid = '{table_name}'::regclass
-            AND i.indisprimary;
-            """
-        result = super().get_first(sql=pk_query)
-
+        try:
+            pk_query = f"""
+                SELECT a.attname
+                FROM pg_index i
+                JOIN pg_attribute a 
+                ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+                WHERE i.indrelid = '{table_name}'::regclass
+                AND i.indisprimary;
+                """
+            result = super().get_first(sql=pk_query)
+        except Exception:
+            return None
         return result[0] if result else None
 
     def get_conn(self):
@@ -112,7 +114,7 @@ class PostgreSQLConnectorHook(DbApiHookInterface):
         This build_upsert_query function use upsert feature statement for pgsql
     """
 
-    def build_upsert_query(self, table_name: str, dataset_table: DataFrame):
+    def build_upsert_query(self, table_name: str, dataset_table: DataFrame, constraint_name: str = None):
         if dataset_table.empty:
             return None
 
@@ -120,9 +122,16 @@ class PostgreSQLConnectorHook(DbApiHookInterface):
         query = f"INSERT INTO {table_name}({columns_name}) VALUES "
         dataset_table_records = dataset_table.values.tolist()
         query += self._build_insert_records(dataset_table_records)
-        result_pk = self._get_primary_key(table_name)
-        if result_pk:
-            query += f"\n ON CONFLICT ({result_pk}) \n DO \n UPDATE SET {self._build_update_records(dataset_table.columns.tolist())}"
+        if constraint_name:
+            query += f"\n ON CONFLICT ON CONSTRAINT {constraint_name}  \n DO \n UPDATE SET {self._build_update_records(dataset_table.columns.tolist())}"
+        else:
+            try:    
+                result_pk = self._get_primary_key(table_name)
+            except Exception as e:
+                pass
+                result_pk = None
+            if result_pk:
+                query += f"\n ON CONFLICT ({result_pk}) \n DO \n UPDATE SET {self._build_update_records(dataset_table.columns.tolist())}"
         return query
 
     def query_run(self, sql: str, autocommit: bool):
