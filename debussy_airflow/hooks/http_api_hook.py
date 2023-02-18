@@ -12,7 +12,7 @@ class PaginatedApiHook(HttpHook, ABC):
 
     @abstractmethod
     def request_pages(
-        self, endpoint, data=None, headers=None, extra_options=None, **request_kwargs
+        self, endpoint, data=None, extra_options=None, **request_kwargs
     ):
         pass
 
@@ -22,23 +22,22 @@ class PaginatedApiHook(HttpHook, ABC):
         pass
 
     def run(
-        self, endpoint, data=None, headers=None, extra_options=None, **request_kwargs
+        self, endpoint, data=None, extra_options=None, **request_kwargs
     ) -> requests.Response:
         responses = []
         for response_page in self.request_pages(
-            endpoint, data, headers, extra_options, **request_kwargs
+            endpoint, data, extra_options, **request_kwargs
         ):
             responses.append(response_page)
         response = self.responses_handler_callable(responses)
         return response
 
     def fetch_page(
-        self, endpoint, data=None, headers=None, extra_options=None, **request_kwargs
+        self, endpoint, data=None, extra_options=None, **request_kwargs
     ) -> requests.Response:
         return super().run(
-            endpoint,
+            endpoint=endpoint,
             data=data,
-            headers=headers,
             extra_options=extra_options,
             **request_kwargs,
         )
@@ -46,7 +45,7 @@ class PaginatedApiHook(HttpHook, ABC):
 
 class LinkPaginatedApiHook(PaginatedApiHook):
     def request_pages(
-        self, endpoint, data=None, headers=None, extra_options=None, **request_kwargs
+        self, endpoint, data=None, extra_options=None, **request_kwargs
     ):
         link_next = {"url": endpoint}
         while link_next:
@@ -56,7 +55,7 @@ class LinkPaginatedApiHook(PaginatedApiHook):
             self.log.info(f"Fetching page from {endpoint}.")
 
             response = super().fetch_page(
-                endpoint, data, headers, extra_options, **request_kwargs
+                endpoint, data, extra_options, **request_kwargs
             )
             # we dont need data querystring anymore as the next link already have it
             data = None
