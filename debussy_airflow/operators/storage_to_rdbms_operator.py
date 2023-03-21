@@ -38,6 +38,7 @@ class StorageToRdbmsOperator(BaseOperator):
         self.storage_hook.download_file(self.storage_file_uri, tmp_filepath)
 
         self.log.info("StorageToRdbmsOperator - Retrieving data of storage")
+
         dataset_table = pd.read_csv(
             tmp_filepath,
             encoding="utf-8",
@@ -46,6 +47,8 @@ class StorageToRdbmsOperator(BaseOperator):
             keep_default_na=False,
             na_values=None,
         )
+        if 'cpf' in dataset_table.columns:
+            dataset_table["cpf"] = dataset_table["cpf"].apply(lambda x: str(x).zfill(11))
         self.log.info("StorageToRdbmsOperator - Building insert query")
         query = self.dbapi_hook.build_upsert_query(
             table_name=self.table_name, dataset_table=dataset_table, constraint_name = self.constraint_name)
