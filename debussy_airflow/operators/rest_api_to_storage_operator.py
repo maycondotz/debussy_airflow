@@ -1,5 +1,6 @@
-from typing import Callable, List, Optional, Union, Dict, Any
+import time
 import requests
+from typing import Callable, List, Optional, Union, Dict, Any
 from airflow.hooks.http_hook import HttpHook as AirflowHttpHook
 from airflow.models import BaseOperator
 from debussy_airflow.hooks.http_hook import HttpHook as DebussyHttpHook
@@ -15,7 +16,7 @@ class RestApiToStorageOperator(BaseOperator):
         "httphook_kwargs",
         "data",
         "json",
-        "headers"
+        "headers",
     )
 
     def __init__(
@@ -82,17 +83,27 @@ class RestApiToStorageOperator(BaseOperator):
         )
 
     def api_to_storage(
-        self, headers=None, data=None, endpoint=None, json=None, object_path=None, raw_object_path=None, httphook_kwargs=None ,context=None
+        self,
+        headers=None,
+        data=None,
+        endpoint=None,
+        json=None,
+        object_path=None,
+        raw_object_path=None,
+        httphook_kwargs=None,
+        context=None,
     ):
         httphook_kwargs = httphook_kwargs or {}
-        response = self.http_hook.run(headers=headers, endpoint=endpoint, json=json, data=data, **httphook_kwargs)
+        response = self.http_hook.run(
+            headers=headers, endpoint=endpoint, json=json, data=data, **httphook_kwargs
+        )
 
         if self.flag_save_raw_response and raw_object_path:
             self.upload_from_string(self.raw_bucket, raw_object_path, response.text)
         data_string = self.transformer(response, **context)
 
         self.upload_from_string(self.bucket, object_path, data_string)
-        return len(data_string)    
+        return len(data_string)
 
     def execute(self, context):
         return self.api_to_storage(
@@ -155,18 +166,25 @@ class RestListApiToStorageOperator(BaseOperator):
         )
 
     def api_to_storage_list(
-        self, headers=None, endpoint=None, object_path=None, raw_object_path=None, httphook_kwargs=None ,context=None
+        self,
+        headers=None,
+        endpoint=None,
+        object_path=None,
+        raw_object_path=None,
+        httphook_kwargs=None,
+        context=None,
     ):
         httphook_kwargs = httphook_kwargs or {}
-        response = self.http_hook.run(headers=headers, endpoint=endpoint, **httphook_kwargs)
+        response = self.http_hook.run(
+            headers=headers, endpoint=endpoint, **httphook_kwargs
+        )
 
         if self.flag_save_raw_response and raw_object_path:
             self.upload_from_string(self.raw_bucket, raw_object_path, response.text)
         data_string = self.transformer(response, **context)
-        
+
         self.upload_from_string(self.bucket, object_path, data_string)
         return len(data_string)
-       
 
     def execute(self, context):
         for endpoint, object_path, raw_object_path, httphook_kwargs in zip(
@@ -175,6 +193,12 @@ class RestListApiToStorageOperator(BaseOperator):
             self.raw_object_paths,
             self.httphook_kwargs,
         ):
+
             self.api_to_storage_list(
-                endpoint=endpoint, object_path=object_path, raw_object_path=raw_object_path, httphook_kwargs=httphook_kwargs, context=context
+                endpoint=endpoint,
+                object_path=object_path,
+                raw_object_path=raw_object_path,
+                httphook_kwargs=httphook_kwargs,
+                context=context,
             )
+            time.sleep(3)
