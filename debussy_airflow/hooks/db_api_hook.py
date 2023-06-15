@@ -14,7 +14,9 @@ class DbApiHookInterface(DbApiHook):
         pass
 
     @abstractmethod
-    def build_upsert_query(self, table_name: str, dataset_table: DataFrame, constraint_name: str = None):
+    def build_upsert_query(
+        self, table_name: str, dataset_table: DataFrame, constraint_name: str = None
+    ):
         pass
 
 
@@ -40,7 +42,9 @@ class MySqlConnectorHook(DbApiHookInterface):
         conn_config = self._get_conn_config_mysql_client(conn)
         return mysql.connect(**conn_config)
 
-    def build_upsert_query(self, table_name: str, dataset_table: DataFrame, constraint_name: str = None):
+    def build_upsert_query(
+        self, table_name: str, dataset_table: DataFrame, constraint_name: str = None
+    ):
         if dataset_table.empty:
             return None
 
@@ -48,8 +52,7 @@ class MySqlConnectorHook(DbApiHookInterface):
         query = f"REPLACE INTO {table_name}({','.join(escaped_columns)}) VALUES "
         query_records = []
         for records in dataset_table.values.tolist():
-            query_records.append(str(records).replace(
-                "[", "(").replace("]", ")"))
+            query_records.append(str(records).replace("[", "(").replace("]", ")"))
         query_records = ",".join(query_records) + ";"
         query += query_records
         return query
@@ -63,18 +66,15 @@ class PostgreSQLConnectorHook(DbApiHookInterface):
         self.rdbms_conn_id = rdbms_conn_id
         self.conn_name_attr = rdbms_conn_id
 
-    def _build_insert_records(self, dataset_table_values: list):
+    def _build_insert_records(self, dataset_table_values: list) -> str:
         query_records = []
         for records in dataset_table_values:
-            query_records.append(str(records).replace(
-                "[", "(").replace("]", ")"))
+            query_records.append(str(records).replace("[", "(").replace("]", ")"))
         query_records = ",".join(query_records)
         return query_records
 
     def _build_update_records(self, columns: list):
-
-        query_update_records = [
-            f"{column}=excluded.{column}," for column in columns]
+        query_update_records = [f"{column}=excluded.{column}," for column in columns]
         query_update_records = f"{''.join(query_update_records)[:-1]};"
         return query_update_records
 
@@ -114,18 +114,21 @@ class PostgreSQLConnectorHook(DbApiHookInterface):
         This build_upsert_query function use upsert feature statement for pgsql
     """
 
-    def build_upsert_query(self, table_name: str, dataset_table: DataFrame, constraint_name: str = None):
+    def build_upsert_query(
+        self, table_name: str, dataset_table: DataFrame, constraint_name: str = None
+    ):
         if dataset_table.empty:
             return None
 
-        columns_name = ','.join(dataset_table.columns.tolist())
+        columns_name = ",".join(dataset_table.columns.tolist())
         query = f"INSERT INTO {table_name}({columns_name}) VALUES "
         dataset_table_records = dataset_table.values.tolist()
-        query += self._build_insert_records(dataset_table_records)
+        query += self._build_insert_records(dataset_table_records).replace('"', "'")
+
         if constraint_name:
             query += f"\n ON CONFLICT ON CONSTRAINT {constraint_name}  \n DO \n UPDATE SET {self._build_update_records(dataset_table.columns.tolist())}"
         else:
-            try:    
+            try:
                 result_pk = self._get_primary_key(table_name)
             except Exception as e:
                 pass
