@@ -94,16 +94,23 @@ class RestApiToStorageOperator(BaseOperator):
         context=None,
     ):
         httphook_kwargs = httphook_kwargs or {}
-        response = self.http_hook.run(
-            headers=headers, endpoint=endpoint, json=json, data=data, **httphook_kwargs
-        )
+        try:
+            response = self.http_hook.run(
+                headers=headers,
+                endpoint=endpoint,
+                json=json,
+                data=data,
+                **httphook_kwargs,
+            )
 
-        if self.flag_save_raw_response and raw_object_path:
-            self.upload_from_string(self.raw_bucket, raw_object_path, response.text)
-        data_string = self.transformer(response, **context)
+            if self.flag_save_raw_response and raw_object_path:
+                self.upload_from_string(self.raw_bucket, raw_object_path, response.text)
+            data_string = self.transformer(response, **context)
 
-        self.upload_from_string(self.bucket, object_path, data_string)
-        return len(data_string)
+            self.upload_from_string(self.bucket, object_path, data_string)
+            return len(data_string)
+        except Exception as e:
+            print(f"EXECÇÃO: {str(e)}")
 
     def execute(self, context):
         return self.api_to_storage(
@@ -193,7 +200,6 @@ class RestListApiToStorageOperator(BaseOperator):
             self.raw_object_paths,
             self.httphook_kwargs,
         ):
-
             self.api_to_storage_list(
                 endpoint=endpoint,
                 object_path=object_path,
