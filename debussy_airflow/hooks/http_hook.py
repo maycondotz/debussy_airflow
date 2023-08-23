@@ -164,6 +164,7 @@ class HttpHook(BaseHook):
             req = requests.Request(
                 self.method, url, params=data, headers=headers, **request_kwargs
             )
+            self.log.info("url: '%s' headers: %s kwargs: %s", url, headers, **request_kwargs)
         elif self.method == "HEAD":
             # HEAD doesn't use params
             req = requests.Request(self.method, url, headers=headers, **request_kwargs)

@@ -76,7 +76,8 @@ class GCSHook(StorageHookInterface, AirflowGCSHook):
             f"GCSHook - Uploading file from {local_file_uri} to {remote_file_uri}"
         )
         bucket, object_path = _parse_gcs_url(remote_file_uri)
-
+        if local_file_uri is None:
+            return None
         return super().upload(
             bucket_name=bucket,
             object_name=object_path,
