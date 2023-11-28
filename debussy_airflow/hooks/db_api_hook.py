@@ -54,6 +54,7 @@ class MySqlConnectorHook(DbApiHookInterface):
         for records in dataset_table.values.tolist():
             query_records.append(str(records).replace("[", "(").replace("]", ")"))
         query_records = ",".join(query_records) + ";"
+        query_records = query_records.replace("''","NULL")
         query += query_records
         return query
 
